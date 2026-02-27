@@ -393,7 +393,7 @@ class ReviewDecision(BaseModel):
 
 @app.post("/api/admin/review/{thread_id}")
 async def submit_review_decision(thread_id: str, decision: ReviewDecision):
-    """Submit human review decision for an application."""
+    """Submit human review decision for an application and resume workflow."""
     try:
         db = await DatabaseConfig.get_database()
         
@@ -413,35 +413,90 @@ async def submit_review_decision(thread_id: str, decision: ReviewDecision):
             f"Human Review: {'APPROVED' if decision.approved else 'REJECTED'} - {decision.comments or 'No comments'}"
         ]
         
-        # If approved, adjust the decision
-        if decision.approved:
-            if current_values.get("eligibility_score", 0) >= 60:
-                current_values["final_decision"] = "admitted"
-            else:
-                current_values["final_decision"] = "waitlisted"
-        else:
-            current_values["final_decision"] = "denied"
-        
-        # Continue the workflow by updating to dispatch stage
-        current_values["current_stage"] = "dispatch"
-        
-        # Update graph state (this will trigger the dispatch node)
+        # Update graph state
         graph.update_state(config, current_values)
         
-        # Update database
-        await db.applications.update_one(
-            {"thread_id": thread_id},
-            {"$set": {
-                "human_review_completed": True,
-                "human_decision": decision.approved,
-                "updated_at": datetime.now(timezone.utc)
-            }}
-        )
+        # Resume workflow from interview or decision based on eligibility
+        meets_requirements = current_values.get("meets_basic_requirements", False)
+        
+        # Continue the workflow in background
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        async def resume_workflow():
+            try:
+                # Start from interview if eligible, otherwise go to decision
+                if decision.approved:
+                    if meets_requirements:
+                        # Update to trigger interview node
+                        current_values["current_stage"] = "interview"
+                        graph.update_state(config, current_values)
+                        
+                        # Continue execution from interview
+                        loop = asyncio.get_event_loop()
+                        executor = ThreadPoolExecutor(max_workers=1)
+                        
+                        # Execute interview node
+                        interview_result = await loop.run_in_executor(executor, interview_scheduler_node, current_values)
+                        current_values.update(interview_result)
+                        graph.update_state(config, current_values)
+                        
+                        # Execute decision node
+                        decision_result = await loop.run_in_executor(executor, decision_node, current_values)
+                        current_values.update(decision_result)
+                        graph.update_state(config, current_values)
+                        
+                        # Execute dispatch node
+                        dispatch_result = await loop.run_in_executor(executor, offer_dispatch_node, current_values)
+                        current_values.update(dispatch_result)
+                        graph.update_state(config, current_values)
+                    else:
+                        # Skip interview, go directly to decision
+                        current_values["current_stage"] = "decision"
+                        graph.update_state(config, current_values)
+                        
+                        loop = asyncio.get_event_loop()
+                        executor = ThreadPoolExecutor(max_workers=1)
+                        
+                        decision_result = await loop.run_in_executor(executor, decision_node, current_values)
+                        current_values.update(decision_result)
+                        graph.update_state(config, current_values)
+                        
+                        dispatch_result = await loop.run_in_executor(executor, offer_dispatch_node, current_values)
+                        current_values.update(dispatch_result)
+                        graph.update_state(config, current_values)
+                else:
+                    # Rejected - mark as denied
+                    current_values["final_decision"] = "denied"
+                    current_values["current_stage"] = "completed"
+                    current_values["status"] = "completed"
+                    current_values["decision_reasoning"] = "Rejected during human review"
+                    graph.update_state(config, current_values)
+                
+                # Update database
+                await db.applications.update_one(
+                    {"thread_id": thread_id},
+                    {"$set": {
+                        "human_review_completed": True,
+                        "human_decision": decision.approved,
+                        "current_stage": current_values.get("current_stage"),
+                        "status": current_values.get("status"),
+                        "final_decision": current_values.get("final_decision"),
+                        "updated_at": datetime.now(timezone.utc)
+                    }}
+                )
+                
+                print(f"Workflow resumed for {thread_id}: {current_values.get('final_decision')}")
+            except Exception as e:
+                print(f"Error resuming workflow for {thread_id}: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        asyncio.create_task(resume_workflow())
         
         return {
             "status": "success",
-            "message": f"Review decision recorded: {'Approved' if decision.approved else 'Rejected'}",
-            "final_decision": current_values["final_decision"]
+            "message": f"Review decision recorded and workflow resumed: {'Approved' if decision.approved else 'Rejected'}"
         }
     except HTTPException:
         raise
