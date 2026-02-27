@@ -1,0 +1,153 @@
+{
+  "identity": {
+    "persona": "E1",
+    "philosophy": "Fusion over Imitation. Emotion First. Content is King.",
+    "anti_patterns": [
+      "Purple/Teal for CTA",
+      "Inter font for Headings",
+      "Center-Everything Disease",
+      "Gradient Overload (>20%)",
+      "Generic 'Bootstrap' Columns"
+    ]
+  },
+  "typography": {
+    "headings": {
+      "font_family": "Merriweather, serif",
+      "weights": ["300", "400", "700", "900"],
+      "usage": "All H1-H3 headings. Use 'Light' (300) for elegance or 'Black' (900) for impact.",
+      "tracking": "tracking-tight"
+    },
+    "body": {
+      "font_family": "Plus Jakarta Sans, sans-serif",
+      "weights": ["400", "500", "600"],
+      "usage": "Body text, UI elements, buttons, data tables.",
+      "tracking": "tracking-normal"
+    },
+    "mono": {
+      "font_family": "JetBrains Mono, monospace",
+      "usage": "Application IDs, Status Codes, Technical Data."
+    }
+  },
+  "colors": {
+    "palette_name": "Modern Ivy League",
+    "theme_strategy": "Light Mode Default (Trust/Clarity) with Dark Mode Option",
+    "primary": {
+      "name": "Oxford Blue",
+      "hex": "#1e3a8a",
+      "tailwind": "bg-blue-900",
+      "usage": "Primary Buttons, Active States, Key Brand Elements"
+    },
+    "secondary": {
+      "name": "Warm Sand",
+      "hex": "#f5f5f4",
+      "tailwind": "bg-stone-100",
+      "usage": "Page Backgrounds (Alternative to harsh white), Section backgrounds"
+    },
+    "accent": {
+      "name": "Academic Gold",
+      "hex": "#d97706",
+      "tailwind": "text-amber-600",
+      "usage": "Highlights, 'Apply Now' CTAs, Progress Indicators"
+    },
+    "neutral": {
+      "surface": "#ffffff",
+      "text_primary": "#0f172a",
+      "text_secondary": "#475569",
+      "border": "#e2e8f0"
+    },
+    "status": {
+      "success": "#059669",
+      "warning": "#d97706",
+      "error": "#dc2626",
+      "info": "#2563eb"
+    },
+    "forbidden_colors": ["#7351B7", "#1B93A4"]
+  },
+  "visual_enhancers": {
+    "textures": [
+      "Subtle Grain: opacity-50 mix-blend-overlay pointer-events-none fixed inset-0 z-50",
+      "Paper Texture: For 'Official' document views"
+    ],
+    "shadows": {
+      "card": "shadow-[0_2px_8px_rgba(0,0,0,0.08)]",
+      "hover": "shadow-[0_8px_24px_rgba(0,0,0,0.12)]",
+      "dropdown": "shadow-xl border border-stone-200"
+    },
+    "borders": {
+      "default": "border border-stone-200",
+      "active": "border-blue-900/20",
+      "radius": "rounded-lg (0.5rem) for Cards, rounded-md (0.375rem) for Inputs"
+    }
+  },
+  "layout_strategies": {
+    "applicant_portal": {
+      "grid_mode": "MODE A: TETRIS GRID",
+      "description": "Asymmetric, welcoming, storytelling-focused.",
+      "spacing": "Generous (p-8 to p-12).",
+      "container": "max-w-7xl mx-auto"
+    },
+    "admin_dashboard": {
+      "grid_mode": "MODE B: HIGH DENSITY GRID",
+      "description": "Dense, data-rich, scanability-focused.",
+      "spacing": "Tight (p-4 to p-6).",
+      "container": "w-full px-6"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-blue-900 text-white hover:bg-blue-800 shadow-sm rounded-full px-8 py-6 text-lg font-medium transition-all hover:scale-[1.02]",
+      "secondary": "bg-white text-blue-900 border border-stone-200 hover:bg-stone-50 rounded-full px-6 py-4",
+      "ghost": "text-stone-600 hover:text-blue-900 hover:bg-stone-100 rounded-lg"
+    },
+    "cards": {
+      "style": "bg-white border border-stone-100 shadow-sm hover:shadow-md transition-all duration-300",
+      "padding": "p-6 or p-8"
+    },
+    "inputs": {
+      "style": "bg-stone-50 border-stone-200 focus:border-blue-900 focus:ring-1 focus:ring-blue-900 rounded-md h-12 px-4"
+    },
+    "navigation": {
+      "style": "Sticky glassmorphism (backdrop-blur-xl bg-white/80) border-b border-stone-200/50"
+    }
+  },
+  "assets": {
+    "images": {
+      "hero_background": {
+        "url": "https://images.unsplash.com/photo-1680444873773-7c106c23ac52?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNTl8MHwxfHNlYXJjaHwxfHx1bml2ZXJzaXR5JTIwY2FtcHVzJTIwbW9kZXJuJTIwYXJjaGl0ZWN0dXJlfGVufDB8fHx8MTc3MjIzMTgzNnww&ixlib=rb-4.1.0&q=85",
+        "alt": "Modern University Campus Building with Stairs",
+        "category": "Landing Page Hero"
+      },
+      "campus_life": {
+        "url": "https://images.unsplash.com/photo-1600903308878-bf5e554ab841?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNTl8MHwxfHNlYXJjaHw0fHx1bml2ZXJzaXR5JTIwY2FtcHVzJTIwbW9kZXJuJTIwYXJjaGl0ZWN0dXJlfGVufDB8fHx8MTc3MjIzMTgzNnww&ixlib=rb-4.1.0&q=85",
+        "alt": "Glass building with red walls",
+        "category": "About Section"
+      },
+      "students_group": {
+        "url": "https://images.unsplash.com/photo-1758270705172-07b53627dfcb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzB8MHwxfHNlYXJjaHwyfHxkaXZlcnNlJTIwdW5pdmVyc2l0eSUyMHN0dWRlbnRzJTIwc3R1ZHlpbmclMjBncm91cHxlbnwwfHx8fDE3NzIyMzE4Mzd8MA&ixlib=rb-4.1.0&q=85",
+        "alt": "Diverse group of students working on laptop",
+        "category": "Community/Student Life"
+      },
+      "lecture_hall": {
+        "url": "https://images.unsplash.com/photo-1758270705087-76e81a5117bd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzB8MHwxfHNlYXJjaHwzfHxkaXZlcnNlJTIwdW5pdmVyc2l0eSUyMHN0dWRlbnRzJTIwc3R1ZHlpbmclMjBncm91cHxlbnwwfHx8fDE3NzIyMzE4Mzd8MA&ixlib=rb-4.1.0&q=85",
+        "alt": "Professor teaching students",
+        "category": "Academics"
+      }
+    },
+    "icons": {
+      "library": "lucide-react",
+      "preferred_set": "Phosphor Icons (for Admin Dashboard), Lucide (General)"
+    }
+  },
+  "universal_guidelines": [
+    "DO NOT use generic centered layouts.",
+    "Create depth through layered design elements (z-index).",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "NO 'transition: all'. Animate specific properties.",
+    "NO AI emojis (🤖, 🚀) as icons.",
+    "Interactive elements MUST have 'data-testid'.",
+    "Use 'sonner' for toasts.",
+    "Export components as Named Exports.",
+    "Pages as Default Exports."
+  ],
+  "instructions_to_main_agent": "Implement the Applicant Portal with the 'Tetris Grid' and the Admin Dashboard with the 'High Density Grid'. Use the provided Unsplash images for the landing page. Ensure the 'Merriweather' font is loaded and used for all headings to give that 'Ivy League' trust factor. Use 'Plus Jakarta Sans' for all UI text."
+}
