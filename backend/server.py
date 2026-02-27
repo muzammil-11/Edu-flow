@@ -152,14 +152,14 @@ async def submit_application(request: ApplicationSubmissionRequest):
         })
         
         # Execute workflow asynchronously
-        graph = await orchestrator.get_compiled_graph()
+        graph = orchestrator.get_compiled_graph()
         config = {"configurable": {"thread_id": thread_id}}
         
         # Run graph in background
         import asyncio
         async def run_workflow():
             try:
-                result = await graph.ainvoke(initial_state, config)
+                result = await asyncio.to_thread(graph.invoke, initial_state, config)
                 # Update database with final state
                 await db.applications.update_one(
                     {"_id": application_id},
@@ -206,17 +206,17 @@ async def get_application_status(thread_id: str):
             raise HTTPException(status_code=404, detail="Application not found")
         
         # Get current state from checkpointer
-        graph = await orchestrator.get_compiled_graph()
+        graph = orchestrator.get_compiled_graph()
         config = {"configurable": {"thread_id": thread_id}}
-        state = await graph.aget_state(config)
+        state = graph.get_state(config)
         
         return ApplicationStatusResponse(
             thread_id=thread_id,
             application_id=application.get("_id"),
-            current_stage=state.values.get("current_stage", "unknown") if state else "unknown",
-            status=state.values.get("status", "unknown") if state else "unknown",
-            agent_reasoning=state.values.get("agent_reasoning", []) if state else [],
-            final_decision=state.values.get("final_decision") if state else None,
+            current_stage=state.values.get("current_stage", "unknown") if state and state.values else "unknown",
+            status=state.values.get("status", "unknown") if state and state.values else "unknown",
+            agent_reasoning=state.values.get("agent_reasoning", []) if state and state.values else [],
+            final_decision=state.values.get("final_decision") if state and state.values else None,
             updated_at=datetime.now(timezone.utc).isoformat()
         )
     except HTTPException:
@@ -242,10 +242,10 @@ async def websocket_endpoint(websocket: WebSocket, thread_id: str):
     
     try:
         # Send initial state
-        graph = await orchestrator.get_compiled_graph()
+        graph = orchestrator.get_compiled_graph()
         config = {"configurable": {"thread_id": thread_id}}
         
-        state = await graph.aget_state(config)
+        state = graph.get_state(config)
         
         if state and state.values:
             await websocket.send_json({
