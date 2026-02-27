@@ -1,5 +1,6 @@
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
-from langgraph.checkpoint.mongodb import AsyncMongoDBSaver
+from langgraph.checkpoint.mongodb import MongoDBSaver
+from pymongo import MongoClient
 import os
 from typing import Optional
 
@@ -8,7 +9,8 @@ class DatabaseConfig:
     
     _client: Optional[AsyncIOMotorClient] = None
     _db: Optional[AsyncIOMotorDatabase] = None
-    _checkpointer: Optional[AsyncMongoDBSaver] = None
+    _checkpointer: Optional[MongoDBSaver] = None
+    _sync_client: Optional[MongoClient] = None
     
     @classmethod
     async def get_client(cls) -> AsyncIOMotorClient:
@@ -32,11 +34,15 @@ class DatabaseConfig:
         return cls._db
     
     @classmethod
-    async def get_checkpointer(cls) -> AsyncMongoDBSaver:
-        """Get the LangGraph MongoDB checkpointer."""
+    def get_checkpointer(cls) -> MongoDBSaver:
+        """Get the LangGraph MongoDB checkpointer (synchronous)."""
         if cls._checkpointer is None:
-            client = await cls.get_client()
-            cls._checkpointer = AsyncMongoDBSaver(client)
+            mongodb_uri = os.getenv("MONGO_URL")
+            if not mongodb_uri:
+                raise ValueError("MONGO_URL not set in environment variables")
+            cls._sync_client = MongoClient(mongodb_uri)
+            db_name = os.getenv("DB_NAME", "test_database")
+            cls._checkpointer = MongoDBSaver(cls._sync_client, db_name)
         return cls._checkpointer
     
     @classmethod
@@ -46,4 +52,7 @@ class DatabaseConfig:
             cls._client.close()
             cls._client = None
             cls._db = None
+        if cls._sync_client is not None:
+            cls._sync_client.close()
+            cls._sync_client = None
             cls._checkpointer = None

@@ -15,7 +15,7 @@ class MultiAgentOrchestrator:
     def __init__(self):
         self.graph = None
     
-    async def _build_graph(self):
+    def _build_graph(self):
         """Construct the LangGraph workflow."""
         workflow = StateGraph(ApplicationState)
         
@@ -45,12 +45,12 @@ class MultiAgentOrchestrator:
         workflow.add_edge("dispatch", END)
         
         # Compile with checkpointer for persistence
-        checkpointer = await DatabaseConfig.get_checkpointer()
+        checkpointer = DatabaseConfig.get_checkpointer()
         
         return workflow.compile(checkpointer=checkpointer)
     
-    async def get_compiled_graph(self):
+    def get_compiled_graph(self):
         """Return the compiled graph for execution."""
         if self.graph is None:
-            self.graph = await self._build_graph()
+            self.graph = self._build_graph()
         return self.graph
