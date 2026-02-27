@@ -348,3 +348,102 @@ async def list_documents(thread_id: str):
         return {"documents": documents, "total": len(documents)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list documents: {str(e)}")
+
+# Human-in-the-Loop Approval Endpoints
+@app.get("/api/admin/pending-reviews")
+async def get_pending_reviews():
+    """Get applications requiring human review."""
+    try:
+        db = await DatabaseConfig.get_database()
+        # Find applications in the database
+        applications = await db.applications.find({}, {"_id": 0}).to_list(100)
+        
+        # Check which ones need review from their states
+        pending_reviews = []
+        graph = orchestrator.get_compiled_graph()
+        
+        for app in applications:
+            thread_id = app.get("thread_id")
+            config = {"configurable": {"thread_id": thread_id}}
+            state = graph.get_state(config)
+            
+            if state and state.values:
+                requires_review = state.values.get("requires_human_review", False)
+                if requires_review and state.values.get("current_stage") not in ["completed"]:
+                    pending_reviews.append({
+                        "thread_id": thread_id,
+                        "application_id": app.get("_id"),
+                        "applicant_name": app.get("submitted_data", {}).get("name"),
+                        "applicant_email": app.get("user_email"),
+                        "program": app.get("submitted_data", {}).get("program"),
+                        "gpa": app.get("submitted_data", {}).get("gpa"),
+                        "current_stage": state.values.get("current_stage"),
+                        "review_reason": state.values.get("human_review_reason"),
+                        "eligibility_score": state.values.get("eligibility_score"),
+                        "submitted_at": app.get("created_at")
+                    })
+        
+        return {"pending_reviews": pending_reviews, "total": len(pending_reviews)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get pending reviews: {str(e)}")
+
+class ReviewDecision(BaseModel):
+    approved: bool
+    comments: Optional[str] = None
+
+@app.post("/api/admin/review/{thread_id}")
+async def submit_review_decision(thread_id: str, decision: ReviewDecision):
+    """Submit human review decision for an application."""
+    try:
+        db = await DatabaseConfig.get_database()
+        
+        # Get current state
+        graph = orchestrator.get_compiled_graph()
+        config = {"configurable": {"thread_id": thread_id}}
+        state = graph.get_state(config)
+        
+        if not state or not state.values:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        # Update state with human approval
+        current_values = dict(state.values)
+        current_values["human_approval"] = decision.approved
+        current_values["requires_human_review"] = False
+        current_values["agent_reasoning"] = current_values.get("agent_reasoning", []) + [
+            f"Human Review: {'APPROVED' if decision.approved else 'REJECTED'} - {decision.comments or 'No comments'}"
+        ]
+        
+        # If approved, adjust the decision
+        if decision.approved:
+            if current_values.get("eligibility_score", 0) >= 60:
+                current_values["final_decision"] = "admitted"
+            else:
+                current_values["final_decision"] = "waitlisted"
+        else:
+            current_values["final_decision"] = "denied"
+        
+        # Continue the workflow by updating to dispatch stage
+        current_values["current_stage"] = "dispatch"
+        
+        # Update graph state (this will trigger the dispatch node)
+        graph.update_state(config, current_values)
+        
+        # Update database
+        await db.applications.update_one(
+            {"thread_id": thread_id},
+            {"$set": {
+                "human_review_completed": True,
+                "human_decision": decision.approved,
+                "updated_at": datetime.now(timezone.utc)
+            }}
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Review decision recorded: {'Approved' if decision.approved else 'Rejected'}",
+            "final_decision": current_values["final_decision"]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to submit review: {str(e)}")
