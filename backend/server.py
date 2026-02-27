@@ -151,15 +151,21 @@ async def submit_application(request: ApplicationSubmissionRequest):
             "status": "pending"
         })
         
-        # Execute workflow asynchronously
+        # Execute workflow in background thread to avoid event loop issues
         graph = orchestrator.get_compiled_graph()
         config = {"configurable": {"thread_id": thread_id}}
         
-        # Run graph in background
+        # Run graph in background using thread executor
         import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
         async def run_workflow():
             try:
-                result = await asyncio.to_thread(graph.invoke, initial_state, config)
+                # Run graph.invoke in a separate thread to avoid event loop conflicts
+                loop = asyncio.get_event_loop()
+                executor = ThreadPoolExecutor(max_workers=1)
+                result = await loop.run_in_executor(executor, graph.invoke, initial_state, config)
+                
                 # Update database with final state
                 await db.applications.update_one(
                     {"_id": application_id},
@@ -170,6 +176,7 @@ async def submit_application(request: ApplicationSubmissionRequest):
                         "updated_at": datetime.now(timezone.utc)
                     }}
                 )
+                
                 # Broadcast final state via WebSocket
                 await manager.broadcast(thread_id, {
                     "type": "workflow_complete",
@@ -181,8 +188,12 @@ async def submit_application(request: ApplicationSubmissionRequest):
                     },
                     "timestamp": datetime.now(timezone.utc).isoformat()
                 })
+                
+                print(f"Workflow completed for {thread_id}: {result.get('final_decision')}")
             except Exception as e:
-                print(f"Workflow error: {e}")
+                print(f"Workflow error for {thread_id}: {e}")
+                import traceback
+                traceback.print_exc()
         
         asyncio.create_task(run_workflow())
         
