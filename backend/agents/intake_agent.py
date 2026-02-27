@@ -1,6 +1,5 @@
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 import os
-import asyncio
 
 def create_intake_agent():
     """Create the application intake agent."""
@@ -18,11 +17,10 @@ def create_intake_agent():
     ).with_model("openai", "gpt-4o")
     return chat
 
-def intake_node(state: dict) -> dict:
-    """Process application intake."""
+async def intake_node_async(state: dict) -> dict:
+    """Process application intake asynchronously."""
     submitted_data = state.get("submitted_data", {})
     
-    # Create intake message
     intake_message = f"""New application received:
 Name: {submitted_data.get('name')}
 Email: {submitted_data.get('email')}
@@ -34,9 +32,10 @@ Validate this information and confirm receipt."""
     
     try:
         chat = create_intake_agent()
-        response = asyncio.run(chat.send_message(UserMessage(text=intake_message)))
+        response = await chat.send_message(UserMessage(text=intake_message))
         response_text = response
     except Exception as e:
+        print(f"Intake agent error: {e}")
         response_text = f"Intake processed: Application for {submitted_data.get('name')} received successfully."
     
     return {
@@ -46,3 +45,27 @@ Validate this information and confirm receipt."""
             f"Intake: Received application for {submitted_data.get('name')} - {submitted_data.get('program')}"
         ]
     }
+
+def intake_node(state: dict) -> dict:
+    """Synchronous wrapper for intake node."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # We're in an async context, create a new task
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, intake_node_async(state))
+                return future.result(timeout=30)
+        else:
+            return asyncio.run(intake_node_async(state))
+    except Exception as e:
+        print(f"Intake node error: {e}")
+        submitted_data = state.get("submitted_data", {})
+        return {
+            "current_stage": "verification",
+            "status": "in_progress",
+            "agent_reasoning": state.get("agent_reasoning", []) + [
+                f"Intake: Received application for {submitted_data.get('name')} - {submitted_data.get('program')}"
+            ]
+        }
