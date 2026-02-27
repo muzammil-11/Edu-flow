@@ -282,3 +282,69 @@ async def websocket_endpoint(websocket: WebSocket, thread_id: str):
     except Exception as e:
         await manager.disconnect(thread_id, websocket)
         print(f"WebSocket error: {e}")
+
+# Document Upload Endpoints
+@app.post("/api/documents/upload/{thread_id}")
+async def upload_document(thread_id: str, file: UploadFile = File(...), document_type: str = "transcript"):
+    """Upload a document for an application."""
+    try:
+        # Read file content
+        content = await file.read()
+        
+        # Extract text using OCR/PDF parsing
+        extracted_text = ""
+        if file.content_type == "application/pdf":
+            try:
+                from pypdf import PdfReader
+                from io import BytesIO
+                pdf_reader = PdfReader(BytesIO(content))
+                extracted_text = ""
+                for page in pdf_reader.pages:
+                    extracted_text += page.extract_text() + "\n"
+            except Exception as e:
+                print(f"PDF extraction error: {e}")
+        elif file.content_type in ["image/png", "image/jpeg", "image/jpg"]:
+            try:
+                import pytesseract
+                from PIL import Image
+                from io import BytesIO
+                image = Image.open(BytesIO(content))
+                extracted_text = pytesseract.image_to_string(image)
+            except Exception as e:
+                print(f"OCR error: {e}")
+                extracted_text = "[OCR not available]"
+        
+        # Store document in MongoDB
+        db = await DatabaseConfig.get_database()
+        document_id = str(uuid.uuid4())
+        await db.documents.insert_one({
+            "_id": document_id,
+            "thread_id": thread_id,
+            "document_type": document_type,
+            "filename": file.filename,
+            "content_type": file.content_type,
+            "size": len(content),
+            "extracted_text": extracted_text[:5000],  # Store first 5000 chars
+            "uploaded_at": datetime.now(timezone.utc),
+            "verified": False
+        })
+        
+        return {
+            "document_id": document_id,
+            "status": "uploaded",
+            "extracted_text_preview": extracted_text[:500] if extracted_text else None,
+            "message": "Document uploaded and processed successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload document: {str(e)}")
+
+@app.get("/api/documents/list/{thread_id}")
+async def list_documents(thread_id: str):
+    """List all documents for an application."""
+    try:
+        db = await DatabaseConfig.get_database()
+        documents = await db.documents.find({"thread_id": thread_id}, {"_id": 0}).to_list(None)
+        
+        return {"documents": documents, "total": len(documents)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list documents: {str(e)}")
