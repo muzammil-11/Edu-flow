@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { GraduationCap, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
+import DocumentUpload from '@/components/DocumentUpload';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -211,6 +212,9 @@ export default function ApplicationStatus() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Document Upload Section */}
+        <DocumentUpload threadId={threadId} />
 
         {/* Agent Activity Log */}
         {applicationData.agent_reasoning && applicationData.agent_reasoning.length > 0 && (
