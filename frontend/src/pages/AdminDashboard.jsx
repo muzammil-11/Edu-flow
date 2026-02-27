@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { GraduationCap, TrendingUp, Users, FileCheck, Clock } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { GraduationCap, TrendingUp, Users, FileCheck, Clock, AlertCircle } from 'lucide-react';
+import ReviewQueue from '@/components/ReviewQueue';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -83,132 +85,148 @@ export default function AdminDashboard() {
       </nav>
 
       <div className="w-full px-6 py-8">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card data-testid="stat-total-applications" className="bg-white border border-stone-100 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-600">Total Applications</p>
-                  <p className="text-3xl font-bold text-slate-900 mt-2">{stats.total}</p>
-                </div>
-                <Users className="w-10 h-10 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
+        {/* Tabs for different views */}
+        <Tabs defaultValue="pipeline" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="pipeline" data-testid="pipeline-tab">Pipeline</TabsTrigger>
+            <TabsTrigger value="reviews" data-testid="reviews-tab">
+              Reviews {stats.pending > 0 && <Badge className="ml-2 bg-amber-600">{stats.pending}</Badge>}
+            </TabsTrigger>
+          </TabsList>
 
-          <Card data-testid="stat-pending" className="bg-white border border-stone-100 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-600">In Progress</p>
-                  <p className="text-3xl font-bold text-amber-600 mt-2">{stats.pending}</p>
-                </div>
-                <Clock className="w-10 h-10 text-amber-600" />
-              </div>
-            </CardContent>
-          </Card>
+          <TabsContent value="pipeline" className="space-y-6">
+            {/* Stats Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <Card data-testid="stat-total-applications" className="bg-white border border-stone-100 shadow-sm">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-slate-600">Total Applications</p>
+                      <p className="text-3xl font-bold text-slate-900 mt-2">{stats.total}</p>
+                    </div>
+                    <Users className="w-10 h-10 text-blue-600" />
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card data-testid="stat-admitted" className="bg-white border border-stone-100 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-600">Completed</p>
-                  <p className="text-3xl font-bold text-green-600 mt-2">{stats.admitted}</p>
-                </div>
-                <FileCheck className="w-10 h-10 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
+              <Card data-testid="stat-pending" className="bg-white border border-stone-100 shadow-sm">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-slate-600">In Progress</p>
+                      <p className="text-3xl font-bold text-amber-600 mt-2">{stats.pending}</p>
+                    </div>
+                    <Clock className="w-10 h-10 text-amber-600" />
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card data-testid="stat-conversion-rate" className="bg-white border border-stone-100 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-600">Success Rate</p>
-                  <p className="text-3xl font-bold text-blue-900 mt-2">
-                    {stats.total > 0 ? Math.round((stats.admitted / stats.total) * 100) : 0}%
-                  </p>
-                </div>
-                <TrendingUp className="w-10 h-10 text-blue-900" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              <Card data-testid="stat-admitted" className="bg-white border border-stone-100 shadow-sm">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-slate-600">Completed</p>
+                      <p className="text-3xl font-bold text-green-600 mt-2">{stats.admitted}</p>
+                    </div>
+                    <FileCheck className="w-10 h-10 text-green-600" />
+                  </div>
+                </CardContent>
+              </Card>
 
-        {/* Applications Table */}
-        <Card className="bg-white border border-stone-100 shadow-lg">
-          <CardHeader className="p-6 border-b border-stone-100">
-            <CardTitle className="text-2xl font-semibold">Application Pipeline</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="p-12 text-center text-slate-600">
-                <Clock className="w-8 h-8 animate-spin mx-auto mb-4" />
-                Loading applications...
-              </div>
-            ) : applications.length === 0 ? (
-              <div className="p-12 text-center text-slate-600">
-                <FileCheck className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-                <p>No applications yet</p>
-                <Link to="/apply" className="text-blue-900 hover:underline mt-2 inline-block">
-                  Submit the first application
-                </Link>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Applicant</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Program</TableHead>
-                      <TableHead>GPA</TableHead>
-                      <TableHead>Current Stage</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Submitted</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {applications.map((app) => (
-                      <TableRow key={app.thread_id} data-testid={`application-row-${app.thread_id}`}>
-                        <TableCell className="font-medium">
-                          {app.submitted_data?.name || 'N/A'}
-                        </TableCell>
-                        <TableCell>{app.user_email}</TableCell>
-                        <TableCell>{app.submitted_data?.program || 'N/A'}</TableCell>
-                        <TableCell>{app.submitted_data?.gpa || 'N/A'}</TableCell>
-                        <TableCell>{getStageBadge(app.current_stage)}</TableCell>
-                        <TableCell>
-                          <Badge className={
-                            app.status === 'completed' ? 'bg-green-600 text-white' :
-                            app.status === 'in_progress' ? 'bg-blue-600 text-white' :
-                            'bg-stone-300 text-stone-800'
-                          }>
-                            {app.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {new Date(app.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Link 
-                            to={`/status/${app.thread_id}`}
-                            className="text-blue-900 hover:underline text-sm"
-                            data-testid={`view-details-${app.thread_id}`}
-                          >
-                            View Details
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              <Card data-testid="stat-conversion-rate" className="bg-white border border-stone-100 shadow-sm">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-slate-600">Success Rate</p>
+                      <p className="text-3xl font-bold text-blue-900 mt-2">
+                        {stats.total > 0 ? Math.round((stats.admitted / stats.total) * 100) : 0}%
+                      </p>
+                    </div>
+                    <TrendingUp className="w-10 h-10 text-blue-900" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Applications Table */}
+            <Card className="bg-white border border-stone-100 shadow-lg">
+              <CardHeader className="p-6 border-b border-stone-100">
+                <CardTitle className="text-2xl font-semibold">Application Pipeline</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loading ? (
+                  <div className="p-12 text-center text-slate-600">
+                    <Clock className="w-8 h-8 animate-spin mx-auto mb-4" />
+                    Loading applications...
+                  </div>
+                ) : applications.length === 0 ? (
+                  <div className="p-12 text-center text-slate-600">
+                    <FileCheck className="w-12 h-12 mx-auto mb-4 text-slate-400" />
+                    <p>No applications yet</p>
+                    <Link to="/apply" className="text-blue-900 hover:underline mt-2 inline-block">
+                      Submit the first application
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Applicant</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Program</TableHead>
+                          <TableHead>GPA</TableHead>
+                          <TableHead>Current Stage</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Submitted</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {applications.map((app) => (
+                          <TableRow key={app.thread_id} data-testid={`application-row-${app.thread_id}`}>
+                            <TableCell className="font-medium">
+                              {app.submitted_data?.name || 'N/A'}
+                            </TableCell>
+                            <TableCell>{app.user_email}</TableCell>
+                            <TableCell>{app.submitted_data?.program || 'N/A'}</TableCell>
+                            <TableCell>{app.submitted_data?.gpa || 'N/A'}</TableCell>
+                            <TableCell>{getStageBadge(app.current_stage)}</TableCell>
+                            <TableCell>
+                              <Badge className={
+                                app.status === 'completed' ? 'bg-green-600 text-white' :
+                                app.status === 'in_progress' ? 'bg-blue-600 text-white' :
+                                'bg-stone-300 text-stone-800'
+                              }>
+                                {app.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {new Date(app.created_at).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <Link 
+                                to={`/status/${app.thread_id}`}
+                                className="text-blue-900 hover:underline text-sm"
+                                data-testid={`view-details-${app.thread_id}`}
+                              >
+                                View Details
+                              </Link>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="reviews">
+            <ReviewQueue />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
