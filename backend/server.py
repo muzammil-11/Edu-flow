@@ -394,6 +394,153 @@ class ReviewDecision(BaseModel):
     approved: bool
     comments: Optional[str] = None
 
+# Audit & Analytics Endpoints
+@app.get("/api/admin/analytics")
+async def get_analytics():
+    """Get comprehensive analytics and audit metrics for admin dashboard."""
+    try:
+        db = await DatabaseConfig.get_database()
+        applications = await db.applications.find({}, {"_id": 0}).to_list(None)
+        
+        total = len(applications)
+        if total == 0:
+            return {"analytics": {
+                "total": 0, "admitted": 0, "denied": 0, "waitlisted": 0,
+                "pending": 0, "in_review": 0, "admission_rate": 0,
+                "avg_processing_time": 0, "programs": {}, "gpa_distribution": {},
+                "stage_distribution": {}, "timeline": []
+            }}
+        
+        # Decision breakdown
+        admitted = sum(1 for a in applications if a.get("final_decision") == "admitted")
+        denied = sum(1 for a in applications if a.get("final_decision") == "denied")
+        waitlisted = sum(1 for a in applications if a.get("final_decision") == "waitlisted")
+        pending = sum(1 for a in applications if a.get("status") in ["pending", "in_progress"])
+        in_review = sum(1 for a in applications if a.get("status") == "pending_review")
+        completed = sum(1 for a in applications if a.get("status") == "completed")
+        
+        # Program breakdown
+        programs = {}
+        for a in applications:
+            prog = a.get("submitted_data", {}).get("program", "Unknown")
+            if prog not in programs:
+                programs[prog] = {"total": 0, "admitted": 0, "denied": 0, "waitlisted": 0}
+            programs[prog]["total"] += 1
+            decision = a.get("final_decision")
+            if decision in programs[prog]:
+                programs[prog][decision] += 1
+        
+        # GPA distribution
+        gpa_ranges = {"3.5-4.0": 0, "3.0-3.49": 0, "2.5-2.99": 0, "2.0-2.49": 0, "below_2.0": 0}
+        for a in applications:
+            gpa = float(a.get("submitted_data", {}).get("gpa", 0))
+            if gpa >= 3.5:
+                gpa_ranges["3.5-4.0"] += 1
+            elif gpa >= 3.0:
+                gpa_ranges["3.0-3.49"] += 1
+            elif gpa >= 2.5:
+                gpa_ranges["2.5-2.99"] += 1
+            elif gpa >= 2.0:
+                gpa_ranges["2.0-2.49"] += 1
+            else:
+                gpa_ranges["below_2.0"] += 1
+        
+        # Stage distribution
+        stage_dist = {}
+        for a in applications:
+            stage = a.get("current_stage", "unknown")
+            stage_dist[stage] = stage_dist.get(stage, 0) + 1
+        
+        # Processing time (for completed apps)
+        processing_times = []
+        for a in applications:
+            if a.get("created_at") and a.get("updated_at"):
+                try:
+                    created = datetime.fromisoformat(str(a["created_at"]).replace("Z", "+00:00"))
+                    updated = datetime.fromisoformat(str(a["updated_at"]).replace("Z", "+00:00"))
+                    diff_seconds = (updated - created).total_seconds()
+                    if diff_seconds > 0:
+                        processing_times.append(diff_seconds)
+                except Exception:
+                    pass
+        
+        avg_time = sum(processing_times) / len(processing_times) if processing_times else 0
+        
+        # Daily timeline (last 7 days)
+        timeline = []
+        for a in applications:
+            if a.get("created_at"):
+                try:
+                    dt = datetime.fromisoformat(str(a["created_at"]).replace("Z", "+00:00"))
+                    timeline.append({
+                        "date": dt.strftime("%Y-%m-%d"),
+                        "decision": a.get("final_decision", "pending")
+                    })
+                except Exception:
+                    pass
+        
+        return {"analytics": {
+            "total": total,
+            "admitted": admitted,
+            "denied": denied,
+            "waitlisted": waitlisted,
+            "pending": pending,
+            "in_review": in_review,
+            "completed": completed,
+            "admission_rate": round((admitted / total) * 100, 1) if total > 0 else 0,
+            "denial_rate": round((denied / total) * 100, 1) if total > 0 else 0,
+            "avg_processing_time_seconds": round(avg_time, 1),
+            "programs": programs,
+            "gpa_distribution": gpa_ranges,
+            "stage_distribution": stage_dist,
+            "timeline": timeline,
+        }}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get analytics: {str(e)}")
+
+@app.get("/api/admin/audit-log")
+async def get_audit_log():
+    """Get audit log of all application state changes."""
+    try:
+        db = await DatabaseConfig.get_database()
+        applications = await db.applications.find({}, {"_id": 0}).to_list(None)
+        
+        audit_entries = []
+        graph = orchestrator.get_compiled_graph()
+        
+        for app_data in applications:
+            thread_id = app_data.get("thread_id")
+            config = {"configurable": {"thread_id": thread_id}}
+            
+            try:
+                state = graph.get_state(config)
+                reasoning = state.values.get("agent_reasoning", []) if state and state.values else []
+            except Exception:
+                reasoning = []
+            
+            entry = {
+                "thread_id": thread_id,
+                "applicant_name": app_data.get("submitted_data", {}).get("name", "Unknown"),
+                "program": app_data.get("submitted_data", {}).get("program", "Unknown"),
+                "gpa": app_data.get("submitted_data", {}).get("gpa"),
+                "current_stage": app_data.get("current_stage", "unknown"),
+                "status": app_data.get("status", "unknown"),
+                "final_decision": app_data.get("final_decision"),
+                "human_review": app_data.get("human_review_completed", False),
+                "human_decision": app_data.get("human_decision"),
+                "created_at": str(app_data.get("created_at", "")),
+                "updated_at": str(app_data.get("updated_at", "")),
+                "agent_reasoning": reasoning,
+            }
+            audit_entries.append(entry)
+        
+        # Sort by created_at descending
+        audit_entries.sort(key=lambda x: x["created_at"], reverse=True)
+        
+        return {"audit_log": audit_entries, "total": len(audit_entries)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get audit log: {str(e)}")
+
 @app.post("/api/admin/review/{thread_id}")
 async def submit_review_decision(thread_id: str, decision: ReviewDecision):
     """Submit human review decision for an application and resume workflow."""
