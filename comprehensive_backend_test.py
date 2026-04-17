@@ -6,7 +6,7 @@ import io
 from datetime import datetime
 
 class ComprehensiveUniversityAdmissionTester:
-    def __init__(self, base_url="https://eduflow-orchestr.preview.emergentagent.com"):
+    def __init__(self, base_url="https://langgraph-admin.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.tests_run = 0
