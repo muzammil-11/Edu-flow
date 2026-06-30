@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, HTTPException, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, WebSocket, HTTPException, WebSocketDisconnect, UploadFile, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
@@ -14,6 +14,8 @@ from agents.offer_agent import offer_dispatch_node
 from dotenv import load_dotenv
 from pathlib import Path
 import json
+from auth.routes import router as auth_router
+from auth.middleware import require_admin, require_reviewer, get_current_user
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -28,22 +30,21 @@ async def lifespan(app: FastAPI):
     print("Shutting down application...")
     await DatabaseConfig.close()
 
-app = FastAPI(title="University Admission Workflow System", lifespan=lifespan)
+app = FastAPI(title="EDU FLOW UNIVERSITY Admission System", lifespan=lifespan)
 
 # Configure CORS
-origins = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    os.getenv("CORS_ORIGINS", "*"),
-]
+_raw_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
+origins = [o.strip() for o in _raw_origins.split(",")]
 
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router)
 
 # Pydantic Models
 class ApplicationSubmissionRequest(BaseModel):
@@ -104,7 +105,7 @@ async def root():
     return {"message": "University Admission Workflow System API"}
 
 @app.post("/api/applications", response_model=ApplicationResponse)
-async def submit_application(request: ApplicationSubmissionRequest):
+async def submit_application(request: ApplicationSubmissionRequest, current_user: dict = Depends(get_current_user)):
     """Submit a new application and initiate the workflow."""
     try:
         # Create unique identifiers
@@ -147,6 +148,7 @@ async def submit_application(request: ApplicationSubmissionRequest):
         await db.applications.insert_one({
             "_id": application_id,
             "thread_id": thread_id,
+            "user_id": current_user["_id"],
             "user_email": request.email,
             "submitted_data": request.dict(),
             "created_at": datetime.now(timezone.utc),
@@ -239,7 +241,7 @@ async def get_application_status(thread_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get application status: {str(e)}")
 
 @app.get("/api/admin/applications")
-async def list_all_applications():
+async def list_all_applications(admin: dict = Depends(require_admin)):
     """Get all applications for admin dashboard."""
     try:
         db = await DatabaseConfig.get_database()
@@ -288,7 +290,7 @@ async def websocket_endpoint(websocket: WebSocket, thread_id: str):
 
 # Document Upload Endpoints
 @app.post("/api/documents/upload/{thread_id}")
-async def upload_document(thread_id: str, file: UploadFile = File(...), document_type: str = "transcript"):
+async def upload_document(thread_id: str, file: UploadFile = File(...), document_type: str = "transcript", current_user: dict = Depends(get_current_user)):
     """Upload a document for an application."""
     try:
         # Read file content
@@ -354,7 +356,7 @@ async def list_documents(thread_id: str):
 
 # Human-in-the-Loop Approval Endpoints
 @app.get("/api/admin/pending-reviews")
-async def get_pending_reviews():
+async def get_pending_reviews(admin: dict = Depends(require_reviewer)):
     """Get applications requiring human review."""
     try:
         db = await DatabaseConfig.get_database()
@@ -396,7 +398,7 @@ class ReviewDecision(BaseModel):
 
 # Audit & Analytics Endpoints
 @app.get("/api/admin/analytics")
-async def get_analytics():
+async def get_analytics(admin: dict = Depends(require_admin)):
     """Get comprehensive analytics and audit metrics for admin dashboard."""
     try:
         db = await DatabaseConfig.get_database()
@@ -499,7 +501,7 @@ async def get_analytics():
         raise HTTPException(status_code=500, detail=f"Failed to get analytics: {str(e)}")
 
 @app.get("/api/admin/audit-log")
-async def get_audit_log():
+async def get_audit_log(admin: dict = Depends(require_admin)):
     """Get audit log of all application state changes."""
     try:
         db = await DatabaseConfig.get_database()
@@ -542,7 +544,7 @@ async def get_audit_log():
         raise HTTPException(status_code=500, detail=f"Failed to get audit log: {str(e)}")
 
 @app.post("/api/admin/review/{thread_id}")
-async def submit_review_decision(thread_id: str, decision: ReviewDecision):
+async def submit_review_decision(thread_id: str, decision: ReviewDecision, admin: dict = Depends(require_reviewer)):
     """Submit human review decision for an application and resume workflow."""
     try:
         db = await DatabaseConfig.get_database()

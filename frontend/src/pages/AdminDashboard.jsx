@@ -1,21 +1,30 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GraduationCap, TrendingUp, Users, FileCheck, Clock, AlertCircle, BarChart3, ScrollText, CheckCircle, XCircle, Timer } from 'lucide-react';
+import { GraduationCap, TrendingUp, Users, FileCheck, Clock, AlertCircle, BarChart3, ScrollText, CheckCircle, XCircle, Timer, LogOut } from 'lucide-react';
 import ReviewQueue from '@/components/ReviewQueue';
+import { useAuth } from '@/context/AuthContext';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 export default function AdminDashboard() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [applications, setApplications] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [auditLog, setAuditLog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('pipeline');
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   useEffect(() => {
     fetchApplications();
@@ -111,9 +120,23 @@ export default function AdminDashboard() {
                 EduFlow Admin
               </span>
             </Link>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-sm text-slate-600">System Active</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="text-sm text-slate-600">System Active</span>
+              </div>
+              {user && (
+                <span className="text-sm text-stone-500 hidden sm:block">{user.name} · {user.role}</span>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="text-stone-500 hover:text-red-600"
+                data-testid="admin-logout-btn"
+              >
+                <LogOut className="w-4 h-4 mr-1" /> Sign Out
+              </Button>
             </div>
           </div>
         </div>
