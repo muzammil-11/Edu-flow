@@ -1,9 +1,12 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { GraduationCap, FileCheck, Users, Calendar, CheckCircle, Mail } from 'lucide-react';
+import { GraduationCap, FileCheck, Users, Calendar, CheckCircle, Mail, LogOut, LogIn } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LandingPage() {
+  const { user, logout, isAdmin } = useAuth();
+
   return (
     <div className="min-h-screen bg-stone-100">
       {/* Navigation */}
@@ -15,23 +18,57 @@ export default function LandingPage() {
               <span className="text-xl font-bold text-blue-900" style={{fontFamily: 'Merriweather, serif'}}>EduFlow</span>
             </div>
             <div className="flex items-center gap-4">
-              <Link to="/apply">
-                <Button 
-                  data-testid="apply-now-nav-btn"
-                  className="bg-blue-900 text-white hover:bg-blue-800 shadow-sm rounded-full px-8 py-6 text-lg font-medium transition-all hover:scale-105"
-                >
-                  Apply Now
-                </Button>
-              </Link>
-              <Link to="/admin">
-                <Button 
-                  data-testid="admin-dashboard-nav-btn"
-                  variant="ghost" 
-                  className="text-stone-600 hover:text-blue-900 hover:bg-stone-100 rounded-lg"
-                >
-                  Admin
-                </Button>
-              </Link>
+              {user ? (
+                <>
+                  <span className="text-sm text-stone-600 hidden sm:block">
+                    {user.name}
+                  </span>
+                  {isAdmin && (
+                    <Link to="/admin">
+                      <Button
+                        data-testid="admin-dashboard-nav-btn"
+                        variant="ghost"
+                        className="text-stone-600 hover:text-blue-900 hover:bg-stone-100 rounded-lg"
+                      >
+                        Admin
+                      </Button>
+                    </Link>
+                  )}
+                  <Link to="/apply">
+                    <Button
+                      data-testid="apply-now-nav-btn"
+                      className="bg-blue-900 text-white hover:bg-blue-800 shadow-sm rounded-full px-6 py-2 font-medium transition-all hover:scale-105"
+                    >
+                      Apply Now
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={logout}
+                    className="text-stone-500 hover:text-red-600"
+                    data-testid="logout-btn"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link to="/login">
+                    <Button variant="ghost" className="text-stone-600 hover:text-blue-900">
+                      <LogIn className="w-4 h-4 mr-1" /> Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/register">
+                    <Button
+                      data-testid="apply-now-nav-btn"
+                      className="bg-blue-900 text-white hover:bg-blue-800 shadow-sm rounded-full px-6 font-medium transition-all hover:scale-105"
+                    >
+                      Apply Now
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
